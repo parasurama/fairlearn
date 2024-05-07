@@ -1,6 +1,7 @@
 # Copyright (c) Fairlearn contributors.
 # Licensed under the MIT License.
 
+
 def _get_soft_predictions(estimator, X, predict_method):
     r"""Return soft predictions of a classifier.
 
@@ -27,7 +28,8 @@ def _get_soft_predictions(estimator, X, predict_method):
           `decision_function`.
         - 'predict': use the hard values reported by the `predict` method if
           estimator is a classifier, and the regression values if estimator is
-          a regressor. This is equivalent to what is done in [1]_.
+          a regressor. This is equivalent to what is done in
+          :footcite:`hardt2016equality`.
 
     Returns
     -------
@@ -36,9 +38,8 @@ def _get_soft_predictions(estimator, X, predict_method):
 
     References
     ----------
-    .. [1] M. Hardt, E. Price, and N. Srebro, "Equality of Opportunity in
-       Supervised Learning," arXiv.org, 07-Oct-2016.
-       [Online]. Available: https://arxiv.org/abs/1610.02413.
+    .. footbibliography::
+
     """
     if predict_method == "auto":
         if hasattr(estimator, "predict_proba"):

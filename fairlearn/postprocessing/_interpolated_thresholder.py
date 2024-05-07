@@ -1,19 +1,21 @@
 # Copyright (c) Microsoft Corporation and Fairlearn contributors.
 # Licensed under the MIT License.
 
+from warnings import warn
+
 import numpy as np
 from sklearn import clone
 from sklearn.base import BaseEstimator, MetaEstimatorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
-from warnings import warn
 
 from ..utils._common import _get_soft_predictions
 from ..utils._input_validation import _validate_and_reformat_input
 from ._constants import (
     BASE_ESTIMATOR_NONE_ERROR_MESSAGE,
-    BASE_ESTIMATOR_NOT_FITTED_WARNING)
+    BASE_ESTIMATOR_NOT_FITTED_WARNING,
+)
 
 
 class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
@@ -22,6 +24,8 @@ class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
     At prediction time, the predictor takes as input both standard and sensitive features.
     Based on the values of sensitive features, it then applies a randomized thresholding
     transformation according to the provided `interpolation_dict`.
+
+    Read more in the :ref:`User Guide <postprocessing>`.
 
     Parameters
     ----------
@@ -61,7 +65,7 @@ class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
         - 'predict': use the hard values reported by the `predict` method if
           estimator is a classifier, and the regression values if estimator is
           a regressor.
-          This is equivalent to what is done in [1]_.
+          This is equivalent to what is done in :footcite:`hardt2016equality`.
 
         .. versionadded:: 0.7
             In previous versions only the ``predict`` method was used
@@ -73,13 +77,13 @@ class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
 
     References
     ----------
-    .. [1] M. Hardt, E. Price, and N. Srebro, "Equality of Opportunity in
-       Supervised Learning," arXiv.org, 07-Oct-2016.
-       [Online]. Available: https://arxiv.org/abs/1610.02413.
+    .. footbibliography::
+
     """
 
-    def __init__(self, estimator, interpolation_dict, prefit=False,
-                 predict_method='deprecated'):
+    def __init__(
+        self, estimator, interpolation_dict, prefit=False, predict_method="deprecated"
+    ):
         self.estimator = estimator
         self.interpolation_dict = interpolation_dict
         self.prefit = prefit
@@ -136,21 +140,32 @@ class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
         base_predictions = np.array(
             _get_soft_predictions(self.estimator_, X, self._predict_method)
         )
-        _, base_predictions_vector, sensitive_feature_vector, _ = _validate_and_reformat_input(
-            X, y=base_predictions, sensitive_features=sensitive_features, expect_y=True,
-            enforce_binary_labels=False)
+        (
+            _,
+            base_predictions_vector,
+            sensitive_feature_vector,
+            _,
+        ) = _validate_and_reformat_input(
+            X,
+            y=base_predictions,
+            sensitive_features=sensitive_features,
+            expect_y=True,
+            enforce_binary_labels=False,
+        )
 
-        positive_probs = 0.0*base_predictions_vector
+        positive_probs = 0.0 * base_predictions_vector
         for a, interpolation in self.interpolation_dict.items():
-            interpolated_predictions = \
-                interpolation.p0 * interpolation.operation0(base_predictions_vector) + \
-                interpolation.p1 * interpolation.operation1(base_predictions_vector)
-            if 'p_ignore' in interpolation:
-                interpolated_predictions = \
-                    interpolation.p_ignore * interpolation.prediction_constant + \
-                    (1 - interpolation.p_ignore) * interpolated_predictions
-            positive_probs[sensitive_feature_vector == a] = \
-                interpolated_predictions[sensitive_feature_vector == a]
+            interpolated_predictions = interpolation.p0 * interpolation.operation0(
+                base_predictions_vector
+            ) + interpolation.p1 * interpolation.operation1(base_predictions_vector)
+            if "p_ignore" in interpolation:
+                interpolated_predictions = (
+                    interpolation.p_ignore * interpolation.prediction_constant
+                    + (1 - interpolation.p_ignore) * interpolated_predictions
+                )
+            positive_probs[sensitive_feature_vector == a] = interpolated_predictions[
+                sensitive_feature_vector == a
+            ]
         return np.array([1.0 - positive_probs, positive_probs]).transpose()
 
     def predict(self, X, *, sensitive_features, random_state=None):
@@ -177,6 +192,7 @@ class InterpolatedThresholder(BaseEstimator, MetaEstimatorMixin):
         """
         check_is_fitted(self)
         random_state = check_random_state(random_state)
-        positive_probs = self._pmf_predict(
-            X, sensitive_features=sensitive_features)[:, 1]
+        positive_probs = self._pmf_predict(X, sensitive_features=sensitive_features)[
+            :, 1
+        ]
         return (positive_probs >= random_state.rand(len(positive_probs))) * 1
